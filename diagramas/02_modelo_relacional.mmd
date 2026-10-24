@@ -1,14 +1,14 @@
 erDiagram
     CLIENTE {
-        int id PK
+        uuid id PK
         varchar nombre
         varchar email UK
         varchar telefono
         timestamp fecha_registro
     }
     DIRECCION {
-        int id PK
-        int cliente_id FK
+        uuid id PK
+        uuid cliente_id FK
         varchar alias
         varchar linea
         varchar ciudad
@@ -17,31 +17,31 @@ erDiagram
         boolean es_principal
     }
     TIENDA {
-        int id PK
+        uuid id PK
         varchar nombre
         varchar nit UK
         varchar estado
     }
     ADMINISTRADOR {
-        int id PK
+        uuid id PK
         varchar nombre
         varchar email UK
         varchar rol
     }
     TIENDA_ADMINISTRADOR {
-        int tienda_id PK,FK
-        int administrador_id PK,FK
+        uuid tienda_id PK,FK
+        uuid administrador_id PK,FK
         timestamp fecha_asignacion
     }
     CATEGORIA {
-        int id PK
+        uuid id PK
         varchar nombre UK
-        int categoria_padre_id FK
+        uuid categoria_padre_id FK
     }
     PRODUCTO {
-        int id PK
-        int tienda_id FK
-        int categoria_id FK
+        uuid id PK
+        uuid tienda_id FK
+        uuid categoria_id FK
         varchar sku
         varchar nombre
         numeric precio
@@ -50,31 +50,31 @@ erDiagram
         boolean activo
     }
     PEDIDO {
-        int id PK
-        int cliente_id FK
-        int direccion_id FK
+        uuid id PK
+        uuid cliente_id FK
+        uuid direccion_id FK
         timestamp fecha
         varchar estado
         numeric total
     }
     DETALLE_PEDIDO {
-        int pedido_id PK,FK
-        int producto_id PK,FK
+        uuid pedido_id PK,FK
+        uuid producto_id PK,FK
         int cantidad
         numeric precio_unitario
         numeric subtotal
     }
     PAGO {
-        int id PK
-        int pedido_id FK,UK
+        uuid id PK
+        uuid pedido_id FK,UK
         varchar metodo
         numeric monto
         varchar estado
         timestamp fecha
     }
     AUDITORIA_PRECIO {
-        int id PK
-        int producto_id FK
+        uuid id PK
+        uuid producto_id FK
         numeric precio_anterior
         numeric precio_nuevo
         timestamp fecha

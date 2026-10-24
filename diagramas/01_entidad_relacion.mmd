@@ -5,7 +5,7 @@ erDiagram
     TIENDA }o--o{ ADMINISTRADOR : "es gestionada por"
     TIENDA ||--o{ PRODUCTO : "ofrece"
     CATEGORIA ||--o{ PRODUCTO : "clasifica"
-    CATEGORIA |o--o{ CATEGORIA : "subcategoria de"
+    CATEGORIA |o--o{ CATEGORIA : ""
     PEDIDO }o--|{ PRODUCTO : "incluye (cantidad, precio)"
     PEDIDO ||--o| PAGO : "se paga con"
     PRODUCTO ||--o{ AUDITORIA_PRECIO : "registra cambios en"
