@@ -1,0 +1,27 @@
+Prueba de concurrencia: dos sesiones compran la ultima unidad del producto CAM-002 (stock = 1).
+Sesion A abre transaccion y retiene el bloqueo 3 s; sesion B intenta comprar en paralelo.
+
+=== SESION A (gana la unidad) ===
+NOTICE:  Pedido 01a16f06-e2ec-75a5-be05-04a6c74208b6 creado
+             p_pedido_id              
+--------------------------------------
+ 01a16f06-e2ec-75a5-be05-04a6c74208b6
+(1 fila)
+
+ pg_sleep 
+----------
+ 
+(1 fila)
+
+=== SESION B (rechazada, sin sobreventa) ===
+ERROR:  Stock insuficiente o producto inactivo (producto_id=01a16f06-e27b-70a0-b2f4-a28fa847cc9c)
+CONTEXTO:  función PL/pgSQL fn_validar_descontar_stock() en la línea 20 en RAISE
+sentencia SQL: «INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario, subtotal)
+        VALUES (p_pedido_id, v_item.producto_id, v_item.cantidad, 0, 0)»
+función PL/pgSQL sp_crear_pedido(uuid,uuid,jsonb,uuid) en la línea 36 en sentencia SQL
+=== ESTADO FINAL ===
+ stock | lineas 
+-------+--------
+     0 |      1
+(1 fila)
+

@@ -1,0 +1,291 @@
+El estilo de borde es 2.
+TRUNCATE TABLE
+INSERT 0 3
+INSERT 0 5
+INSERT 0 3
+INSERT 0 4
+INSERT 0 5
+INSERT 0 3
+INSERT 0 4
+INSERT 0 5
+=== P1. Stock inicial ===
++--------------------------------------+---------+-------------------------+------------+-------+
+|                  id                  |   sku   |         nombre          |   precio   | stock |
++--------------------------------------+---------+-------------------------+------------+-------+
+| 01a16f06-c0b0-7220-840b-ef752a44bc83 | CAM-001 | Camiseta básica algodón |   49900.00 |   100 |
+| 01a16f06-c0b0-73d3-97ad-ace3934a6381 | CAM-002 | Camiseta estampada      |   69900.00 |     3 |
+| 01a16f06-c0b0-7939-ae73-30ff2144e0b3 | CEL-001 | Smartphone X12 128GB    | 1499000.00 |    25 |
+| 01a16f06-c0b1-7584-ac59-c5a6e24309aa | COC-001 | Olla a presión 6L       |  189900.00 |    15 |
+| 01a16f06-c0af-79e6-90c4-71b853490386 | POR-001 | Portátil Pro 14"        | 3299000.00 |    10 |
++--------------------------------------+---------+-------------------------+------------+-------+
+(5 filas)
+
+=== P2. sp_crear_pedido: Laura compra 2 celulares + 1 portátil (envío a Oficina) ===
+psql:sql/05_pruebas.sql:38: NOTICE:  Pedido 01a16f06-c0be-78a0-a899-cf7c3c4865a7 creado
++--------------------------------------+--------------------------------------+--------------------------------------+-----------+------------+
+|                  id                  |              cliente_id              |             direccion_id             |  estado   |   total    |
++--------------------------------------+--------------------------------------+--------------------------------------+-----------+------------+
+| 01a16f06-c0be-78a0-a899-cf7c3c4865a7 | 01a16f06-c09a-7e55-aa4c-81e43d4a78b3 | 01a16f06-c09f-7fca-90b9-9b0e2447e1b5 | PENDIENTE | 6297000.00 |
++--------------------------------------+--------------------------------------+--------------------------------------+-----------+------------+
+(1 fila)
+
++--------------------------------------+--------------------------------------+----------+-----------------+------------+
+|              pedido_id               |             producto_id              | cantidad | precio_unitario |  subtotal  |
++--------------------------------------+--------------------------------------+----------+-----------------+------------+
+| 01a16f06-c0be-78a0-a899-cf7c3c4865a7 | 01a16f06-c0b0-7939-ae73-30ff2144e0b3 |        2 |      1499000.00 | 2998000.00 |
+| 01a16f06-c0be-78a0-a899-cf7c3c4865a7 | 01a16f06-c0af-79e6-90c4-71b853490386 |        1 |      3299000.00 | 3299000.00 |
++--------------------------------------+--------------------------------------+----------+-----------------+------------+
+(2 filas)
+
+--- Stock descontado por trg_validar_descontar_stock (celular 25->23, portátil 10->9):
++--------------------------------------+---------+-------+
+|                  id                  |   sku   | stock |
++--------------------------------------+---------+-------+
+| 01a16f06-c0b0-7939-ae73-30ff2144e0b3 | CEL-001 |    23 |
+| 01a16f06-c0af-79e6-90c4-71b853490386 | POR-001 |     9 |
++--------------------------------------+---------+-------+
+(2 filas)
+
+=== P3. Pedido SIN stock: Andrés pide 5 camisetas estampadas (stock 3) -> debe fallar y revertir todo ===
+psql:sql/05_pruebas.sql:52: ERROR:  Stock insuficiente o producto inactivo (producto_id=01a16f06-c0b0-73d3-97ad-ace3934a6381)
+CONTEXTO:  función PL/pgSQL fn_validar_descontar_stock() en la línea 20 en RAISE
+sentencia SQL: «INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario, subtotal)
+        VALUES (p_pedido_id, v_item.producto_id, v_item.cantidad, 0, 0)»
+función PL/pgSQL sp_crear_pedido(uuid,uuid,jsonb,uuid) en la línea 36 en sentencia SQL
+--- No se creó el pedido ni se descontó la camiseta básica (sigue en 100):
++-----------------+
+| pedidos_totales |
++-----------------+
+|               1 |
++-----------------+
+(1 fila)
+
++--------------------------------------+---------+-------+
+|                  id                  |   sku   | stock |
++--------------------------------------+---------+-------+
+| 01a16f06-c0b0-7220-840b-ef752a44bc83 | CAM-001 |   100 |
+| 01a16f06-c0b0-73d3-97ad-ace3934a6381 | CAM-002 |     3 |
++--------------------------------------+---------+-------+
+(2 filas)
+
+=== P4. Dirección ajena: Andrés intenta enviar a la casa de Laura -> debe fallar ===
+psql:sql/05_pruebas.sql:59: ERROR:  La dirección 01a16f06-c09f-713d-a5e4-b8289745529d no pertenece al cliente 01a16f06-c09b-7e9c-9c5b-70947946108d
+CONTEXTO:  función PL/pgSQL sp_crear_pedido(uuid,uuid,jsonb,uuid) en la línea 7 en RAISE
+=== P5. Pago aprobado -> trg_pago_actualiza_pedido marca el pedido como PAGADO ===
+INSERT 0 1
++--------------------------------------+--------+------------+
+|                  id                  | estado |   total    |
++--------------------------------------+--------+------------+
+| 01a16f06-c0be-78a0-a899-cf7c3c4865a7 | PAGADO | 6297000.00 |
++--------------------------------------+--------+------------+
+(1 fila)
+
+=== P6. Otros pedidos válidos ===
+psql:sql/05_pruebas.sql:70: NOTICE:  Pedido 01a16f06-c0db-7192-a2e1-d97fd7418f92 creado
+psql:sql/05_pruebas.sql:74: NOTICE:  Pedido 01a16f06-c0e1-70a9-a3fe-bc9d764541ae creado
++--------------------------------------+--------------------------------------+-----------+------------+
+|                  id                  |              cliente_id              |  estado   |   total    |
++--------------------------------------+--------------------------------------+-----------+------------+
+| 01a16f06-c0be-78a0-a899-cf7c3c4865a7 | 01a16f06-c09a-7e55-aa4c-81e43d4a78b3 | PAGADO    | 6297000.00 |
+| 01a16f06-c0db-7192-a2e1-d97fd7418f92 | 01a16f06-c09b-7e9c-9c5b-70947946108d | PENDIENTE |  409300.00 |
+| 01a16f06-c0e1-70a9-a3fe-bc9d764541ae | 01a16f06-c09b-7e33-bbab-76502f4aabb9 | PENDIENTE |  379800.00 |
++--------------------------------------+--------------------------------------+-----------+------------+
+(3 filas)
+
+=== P7. sp_cancelar_pedido: la olla vuelve al inventario (13 -> 15) ===
++--------------------------------------+---------+-------+
+|                  id                  |   sku   | stock |
++--------------------------------------+---------+-------+
+| 01a16f06-c0b1-7584-ac59-c5a6e24309aa | COC-001 |    13 |
++--------------------------------------+---------+-------+
+(1 fila)
+
+psql:sql/05_pruebas.sql:81: NOTICE:  Pedido 01a16f06-c0e1-70a9-a3fe-bc9d764541ae cancelado y stock devuelto
+CALL
++--------------------------------------+---------+-------+
+|                  id                  |   sku   | stock |
++--------------------------------------+---------+-------+
+| 01a16f06-c0b1-7584-ac59-c5a6e24309aa | COC-001 |    15 |
++--------------------------------------+---------+-------+
+(1 fila)
+
++--------------------------------------+-----------+
+|                  id                  |  estado   |
++--------------------------------------+-----------+
+| 01a16f06-c0e1-70a9-a3fe-bc9d764541ae | CANCELADO |
++--------------------------------------+-----------+
+(1 fila)
+
+=== P8. No se puede cancelar dos veces -> debe fallar ===
+psql:sql/05_pruebas.sql:86: ERROR:  No se puede cancelar un pedido en estado CANCELADO
+CONTEXTO:  función PL/pgSQL sp_cancelar_pedido(uuid) en la línea 10 en RAISE
+=== P9. sp_ajustar_precios_tienda: TecnoAndina sube 10% -> trg_auditar_precio registra cada cambio ===
+CALL
++--------------------------------------+-----------------+--------------+-----------+
+|             producto_id              | precio_anterior | precio_nuevo |  usuario  |
++--------------------------------------+-----------------+--------------+-----------+
+| 01a16f06-c0b0-7939-ae73-30ff2144e0b3 |      1499000.00 |   1648900.00 | dba_admin |
+| 01a16f06-c0af-79e6-90c4-71b853490386 |      3299000.00 |   3628900.00 | dba_admin |
++--------------------------------------+-----------------+--------------+-----------+
+(2 filas)
+
+--- El pedido 1 conserva el precio histórico (precio_unitario sin cambios):
++--------------------------------------+--------------------------------------+-----------------+
+|              pedido_id               |             producto_id              | precio_unitario |
++--------------------------------------+--------------------------------------+-----------------+
+| 01a16f06-c0be-78a0-a899-cf7c3c4865a7 | 01a16f06-c0af-79e6-90c4-71b853490386 |      3299000.00 |
+| 01a16f06-c0be-78a0-a899-cf7c3c4865a7 | 01a16f06-c0b0-7939-ae73-30ff2144e0b3 |      1499000.00 |
++--------------------------------------+--------------------------------------+-----------------+
+(2 filas)
+
+=== P10. fn_ventas_por_tienda (excluye cancelados) ===
++-------------+---------+----------+------------+
+|   tienda    | pedidos | unidades |  ingresos  |
++-------------+---------+----------+------------+
+| TecnoAndina |       1 |        3 | 6297000.00 |
+| ModaUrbana  |       1 |        7 |  409300.00 |
++-------------+---------+----------+------------+
+(2 filas)
+
+=== P11. Consulta JSONB: productos de talla M (flexibilidad tipo documento dentro de SQL) ===
++---------+-------------------------+-----------------------------------+
+|   sku   |         nombre          |             atributos             |
++---------+-------------------------+-----------------------------------+
+| CAM-001 | Camiseta básica algodón | {"color": "blanco", "talla": "M"} |
++---------+-------------------------+-----------------------------------+
+(1 fila)
+
+=== P12. Administradores por tienda (N:M) ===
++-------------+----------------------------------------------------+
+|   tienda    |                  administradores                   |
++-------------+----------------------------------------------------+
+| HogarFácil  | Julián Castro (EDITOR)                             |
+| ModaUrbana  | Julián Castro (EDITOR), Sofía Medina (PROPIETARIO) |
+| TecnoAndina | Carlos Rojas (PROPIETARIO), Diana Torres (EDITOR)  |
++-------------+----------------------------------------------------+
+(3 filas)
+
+=== P13. UPDATE de cantidad: ajusta stock y recalcula subtotal (trg_ajustar_stock_update) ===
+psql:sql/05_pruebas.sql:110: NOTICE:  Pedido 01a16f06-c0f9-74ad-87e1-9f5d874630be creado
++--------------------------------------+---------+-------+
+|                  id                  |   sku   | stock |
++--------------------------------------+---------+-------+
+| 01a16f06-c0b0-7220-840b-ef752a44bc83 | CAM-001 |    94 |
++--------------------------------------+---------+-------+
+(1 fila)
+
+UPDATE 1
+--- Mover la línea a otro pedido debe fallar (el total del pedido origen quedaría viejo):
+psql:sql/05_pruebas.sql:115: ERROR:  No se puede mover una línea a otro pedido
+CONTEXTO:  función PL/pgSQL fn_ajustar_stock_update() en la línea 12 en RAISE
++--------------------------------------+--------------------------------------+----------+-----------------+-----------+
+|              pedido_id               |             producto_id              | cantidad | precio_unitario | subtotal  |
++--------------------------------------+--------------------------------------+----------+-----------------+-----------+
+| 01a16f06-c0f9-74ad-87e1-9f5d874630be | 01a16f06-c0b0-7220-840b-ef752a44bc83 |        5 |        49900.00 | 249500.00 |
++--------------------------------------+--------------------------------------+----------+-----------------+-----------+
+(1 fila)
+
++--------------------------------------+---------+-------+
+|                  id                  |   sku   | stock |
++--------------------------------------+---------+-------+
+| 01a16f06-c0b0-7220-840b-ef752a44bc83 | CAM-001 |    91 |
++--------------------------------------+---------+-------+
+(1 fila)
+
++--------------------------------------+-----------+
+|                  id                  |   total   |
++--------------------------------------+-----------+
+| 01a16f06-c0f9-74ad-87e1-9f5d874630be | 249500.00 |
++--------------------------------------+-----------+
+(1 fila)
+
+=== P14. DELETE de una línea: devuelve las unidades al inventario (trg_devolver_stock_delete) ===
+DELETE 1
++--------------------------------------+---------+-------+
+|                  id                  |   sku   | stock |
++--------------------------------------+---------+-------+
+| 01a16f06-c0b0-7220-840b-ef752a44bc83 | CAM-001 |    96 |
++--------------------------------------+---------+-------+
+(1 fila)
+
++--------------------------------------+-------+
+|                  id                  | total |
++--------------------------------------+-------+
+| 01a16f06-c0f9-74ad-87e1-9f5d874630be |  0.00 |
++--------------------------------------+-------+
+(1 fila)
+
+=== P15. Pago con monto distinto al total -> debe fallar (trg_validar_pago) ===
+psql:sql/05_pruebas.sql:127: NOTICE:  Pedido 01a16f06-c106-75b6-96a9-d9953c4681ba creado
+psql:sql/05_pruebas.sql:129: ERROR:  El monto del pago (1.00) no coincide con el total del pedido 01a16f06-c106-75b6-96a9-d9953c4681ba (189900.00)
+CONTEXTO:  función PL/pgSQL fn_validar_pago() en la línea 20 en RAISE
++--------------------------------------+-----------+-----------+
+|                  id                  |  estado   |   total   |
++--------------------------------------+-----------+-----------+
+| 01a16f06-c106-75b6-96a9-d9953c4681ba | PENDIENTE | 189900.00 |
++--------------------------------------+-----------+-----------+
+(1 fila)
+
+=== P16. Pago sobre un pedido CANCELADO -> debe fallar (trg_validar_pago) ===
+psql:sql/05_pruebas.sql:133: ERROR:  No se puede registrar un pago para el pedido 01a16f06-c0e1-70a9-a3fe-bc9d764541ae: está CANCELADO
+CONTEXTO:  función PL/pgSQL fn_validar_pago() en la línea 15 en RAISE
+=== P17. Dirección de otro cliente por INSERT directo -> debe fallar (FK compuesta) ===
+psql:sql/05_pruebas.sql:136: ERROR:  inserción o actualización en la tabla «pedido» viola la llave foránea «fk_pedido_direccion_cliente»
+DETALLE:  La llave (cliente_id, direccion_id)=(01a16f06-c09b-7e9c-9c5b-70947946108d, 01a16f06-c09f-713d-a5e4-b8289745529d) no está presente en la tabla «direccion».
+=== P18. Ítem repetido en el JSON: se agrupa la cantidad en una sola línea ===
+psql:sql/05_pruebas.sql:143: NOTICE:  Pedido 01a16f06-c10d-768f-9aa2-45e8df49cdb9 creado
++--------------------------------------+--------------------------------------+----------+-------------+
+|              pedido_id               |             producto_id              | cantidad |  subtotal   |
++--------------------------------------+--------------------------------------+----------+-------------+
+| 01a16f06-c10d-768f-9aa2-45e8df49cdb9 | 01a16f06-c0af-79e6-90c4-71b853490386 |        3 | 10886700.00 |
++--------------------------------------+--------------------------------------+----------+-------------+
+(1 fila)
+
++--------------------------------------+---------+-------+
+|                  id                  |   sku   | stock |
++--------------------------------------+---------+-------+
+| 01a16f06-c0af-79e6-90c4-71b853490386 | POR-001 |     6 |
++--------------------------------------+---------+-------+
+(1 fila)
+
+=== P19. Borrar un pedido con líneas -> debe fallar (se conserva el historial) ===
+psql:sql/05_pruebas.sql:149: ERROR:  update o delete en «pedido» viola la llave foránea «detalle_pedido_pedido_id_fkey» en la tabla «detalle_pedido»
+DETALLE:  La llave (id)=(01a16f06-c10d-768f-9aa2-45e8df49cdb9) todavía es referida desde la tabla «detalle_pedido».
+--- Borrando primero la línea: devuelve el stock y luego el pedido vacío sí se elimina (9)
+DELETE 1
++--------------------------------------+---------+-------+
+|                  id                  |   sku   | stock |
++--------------------------------------+---------+-------+
+| 01a16f06-c0af-79e6-90c4-71b853490386 | POR-001 |     9 |
++--------------------------------------+---------+-------+
+(1 fila)
+
+DELETE 1
++-------------------+
+| pedidos_restantes |
++-------------------+
+|                 5 |
++-------------------+
+(1 fila)
+
+=== P20. Un pedido CANCELADO es historial: no admite cambios ni devuelve stock otra vez ===
++--------------------------------------+---------+-------+
+|                  id                  |   sku   | stock |
++--------------------------------------+---------+-------+
+| 01a16f06-c0b1-7584-ac59-c5a6e24309aa | COC-001 |    14 |
++--------------------------------------+---------+-------+
+(1 fila)
+
+psql:sql/05_pruebas.sql:159: ERROR:  Solo se pueden quitar líneas de un pedido PENDIENTE (pedido 01a16f06-c0e1-70a9-a3fe-bc9d764541ae está CANCELADO)
+CONTEXTO:  función PL/pgSQL fn_devolver_stock_delete() en la línea 8 en RAISE
+psql:sql/05_pruebas.sql:160: ERROR:  Solo se pueden modificar líneas de un pedido PENDIENTE (pedido 01a16f06-c0e1-70a9-a3fe-bc9d764541ae está CANCELADO)
+CONTEXTO:  función PL/pgSQL fn_ajustar_stock_update() en la línea 7 en RAISE
+psql:sql/05_pruebas.sql:162: ERROR:  Solo se pueden agregar líneas a un pedido PENDIENTE (pedido 01a16f06-c0e1-70a9-a3fe-bc9d764541ae está CANCELADO)
+CONTEXTO:  función PL/pgSQL fn_validar_descontar_stock() en la línea 9 en RAISE
++--------------------------------------+---------+-------+
+|                  id                  |   sku   | stock |
++--------------------------------------+---------+-------+
+| 01a16f06-c0b1-7584-ac59-c5a6e24309aa | COC-001 |    14 |
++--------------------------------------+---------+-------+
+(1 fila)
+
