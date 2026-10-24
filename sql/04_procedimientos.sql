@@ -4,25 +4,29 @@
 
 -- ------------------------------------------------------------------------------
 -- SP1. Crear un pedido completo en una sola transacción.
---      p_items: '[{"producto_id": 1, "cantidad": 2}, ...]'
+--      p_items: '[{"producto_id": "<uuid>", "cantidad": 2}, ...]'
 --      Si cualquier línea falla (p. ej. sin stock) se revierte TODO el pedido.
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE sp_crear_pedido(
-    p_cliente   INT,
-    p_direccion INT,
+    p_cliente   UUID,
+    p_direccion UUID,
     p_items     JSONB,
-    INOUT p_pedido_id INT DEFAULT NULL
+    INOUT p_pedido_id UUID DEFAULT NULL
 )
 LANGUAGE plpgsql AS $$
 DECLARE
-    v_item JSONB;
+    v_item RECORD;
 BEGIN
     -- La dirección debe pertenecer al cliente
     IF NOT EXISTS (SELECT 1 FROM direccion WHERE id = p_direccion AND cliente_id = p_cliente) THEN
         RAISE EXCEPTION 'La dirección % no pertenece al cliente %', p_direccion, p_cliente;
     END IF;
 
-    IF p_items IS NULL OR jsonb_array_length(p_items) = 0 THEN
+    IF p_items IS NULL THEN
+        RAISE EXCEPTION 'p_items no puede ser NULL';
+    ELSIF jsonb_typeof(p_items) <> 'array' THEN
+        RAISE EXCEPTION 'p_items debe ser un arreglo JSON';
+    ELSIF jsonb_array_length(p_items) = 0 THEN
         RAISE EXCEPTION 'El pedido debe tener al menos un producto';
     END IF;
 
@@ -30,10 +34,22 @@ BEGIN
     VALUES (p_cliente, p_direccion)
     RETURNING id INTO p_pedido_id;
 
-    FOR v_item IN SELECT * FROM jsonb_array_elements(p_items) LOOP
+    -- Si el mismo producto llega repetido se agrupa la cantidad: la PK de
+    -- detalle_pedido es (pedido_id, producto_id) y no admite dos filas iguales.
+    FOR v_item IN
+        SELECT (i->>'producto_id')::UUID  AS producto_id,
+               SUM((i->>'cantidad')::INT) AS cantidad
+          FROM jsonb_array_elements(p_items) AS i
+         GROUP BY (i->>'producto_id')::UUID
+         ORDER BY (i->>'producto_id')::UUID
+    LOOP
+        IF v_item.producto_id IS NULL OR v_item.cantidad IS NULL OR v_item.cantidad <= 0 THEN
+            RAISE EXCEPTION 'Ítem inválido en p_items: %', v_item;
+        END IF;
+
         -- precio_unitario y subtotal los calcula trg_validar_descontar_stock
         INSERT INTO detalle_pedido (pedido_id, producto_id, cantidad, precio_unitario, subtotal)
-        VALUES (p_pedido_id, (v_item->>'producto_id')::INT, (v_item->>'cantidad')::INT, 0, 0);
+        VALUES (p_pedido_id, v_item.producto_id, v_item.cantidad, 0, 0);
     END LOOP;
 
     RAISE NOTICE 'Pedido % creado', p_pedido_id;
@@ -42,7 +58,7 @@ END $$;
 -- ------------------------------------------------------------------------------
 -- SP2. Cancelar un pedido y devolver el stock al inventario.
 -- ------------------------------------------------------------------------------
-CREATE OR REPLACE PROCEDURE sp_cancelar_pedido(p_pedido_id INT)
+CREATE OR REPLACE PROCEDURE sp_cancelar_pedido(p_pedido_id UUID)
 LANGUAGE plpgsql AS $$
 DECLARE
     v_estado VARCHAR(12);
@@ -69,7 +85,7 @@ END $$;
 -- ------------------------------------------------------------------------------
 -- SP3. Ajuste masivo de precios de una tienda (cada cambio queda auditado por T3).
 -- ------------------------------------------------------------------------------
-CREATE OR REPLACE PROCEDURE sp_ajustar_precios_tienda(p_tienda_id INT, p_porcentaje NUMERIC)
+CREATE OR REPLACE PROCEDURE sp_ajustar_precios_tienda(p_tienda_id UUID, p_porcentaje NUMERIC)
 LANGUAGE plpgsql AS $$
 BEGIN
     IF p_porcentaje <= -100 THEN
