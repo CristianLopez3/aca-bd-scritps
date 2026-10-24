@@ -2,7 +2,7 @@
 # ACA: BD e-commerce para startup (PostgreSQL 16)
 # Uso:
 #   docker compose up -d                       # crea la BD y ejecuta sql/01..04 en el primer arranque
-#   docker compose exec -T database psql -U dba_admin -d ecommerce_db -f /sql/05_pruebas.sql
+#   docker compose exec -T database psql -U dba_admin -d ecommerce_db -f /sql/05_pruebas.sql # Usa la base de datos en la terminal directamente.
 #   docker compose down -v                     # borrar todo y empezar de cero
 # Puerto 5433 para no chocar con el contenedor de la Tarea 1 (5432)
 # ==============================================================================
