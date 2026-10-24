@@ -1,0 +1,33 @@
+# ==============================================================================
+# ACA: BD e-commerce para startup (PostgreSQL 16)
+# Uso:
+#   docker compose up -d                       # crea la BD y ejecuta sql/01..04 en el primer arranque
+#   docker compose exec -T database psql -U dba_admin -d ecommerce_db -f /sql/05_pruebas.sql
+#   docker compose down -v                     # borrar todo y empezar de cero
+# Puerto 5433 para no chocar con el contenedor de la Tarea 1 (5432)
+# ==============================================================================
+services:
+  database:
+    image: postgres:16-alpine
+    container_name: aca_ecommerce_db
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: ecommerce_db
+      POSTGRES_USER: dba_admin
+      POSTGRES_PASSWORD: cun_admin_2026
+    volumes:
+      - pgdata_aca:/var/lib/postgresql/data
+      - ./sql/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./sql/02_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+      - ./sql/03_triggers.sql:/docker-entrypoint-initdb.d/03_triggers.sql:ro
+      - ./sql/04_procedimientos.sql:/docker-entrypoint-initdb.d/04_procedimientos.sql:ro
+      - ./sql:/sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dba_admin -d ecommerce_db"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  pgdata_aca:

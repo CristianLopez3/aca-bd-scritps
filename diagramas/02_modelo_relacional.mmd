@@ -1,0 +1,94 @@
+erDiagram
+    CLIENTE {
+        int id PK
+        varchar nombre
+        varchar email UK
+        varchar telefono
+        timestamp fecha_registro
+    }
+    DIRECCION {
+        int id PK
+        int cliente_id FK
+        varchar alias
+        varchar linea
+        varchar ciudad
+        varchar departamento
+        varchar codigo_postal
+        boolean es_principal
+    }
+    TIENDA {
+        int id PK
+        varchar nombre
+        varchar nit UK
+        varchar estado
+    }
+    ADMINISTRADOR {
+        int id PK
+        varchar nombre
+        varchar email UK
+        varchar rol
+    }
+    TIENDA_ADMINISTRADOR {
+        int tienda_id PK,FK
+        int administrador_id PK,FK
+        timestamp fecha_asignacion
+    }
+    CATEGORIA {
+        int id PK
+        varchar nombre UK
+        int categoria_padre_id FK
+    }
+    PRODUCTO {
+        int id PK
+        int tienda_id FK
+        int categoria_id FK
+        varchar sku
+        varchar nombre
+        numeric precio
+        int stock
+        jsonb atributos
+        boolean activo
+    }
+    PEDIDO {
+        int id PK
+        int cliente_id FK
+        int direccion_id FK
+        timestamp fecha
+        varchar estado
+        numeric total
+    }
+    DETALLE_PEDIDO {
+        int pedido_id PK,FK
+        int producto_id PK,FK
+        int cantidad
+        numeric precio_unitario
+        numeric subtotal
+    }
+    PAGO {
+        int id PK
+        int pedido_id FK,UK
+        varchar metodo
+        numeric monto
+        varchar estado
+        timestamp fecha
+    }
+    AUDITORIA_PRECIO {
+        int id PK
+        int producto_id FK
+        numeric precio_anterior
+        numeric precio_nuevo
+        timestamp fecha
+        text usuario
+    }
+    CLIENTE ||--o{ DIRECCION : ""
+    CLIENTE ||--o{ PEDIDO : ""
+    DIRECCION ||--o{ PEDIDO : ""
+    TIENDA ||--o{ TIENDA_ADMINISTRADOR : ""
+    ADMINISTRADOR ||--o{ TIENDA_ADMINISTRADOR : ""
+    TIENDA ||--o{ PRODUCTO : ""
+    CATEGORIA ||--o{ PRODUCTO : ""
+    CATEGORIA |o--o{ CATEGORIA : ""
+    PEDIDO ||--|{ DETALLE_PEDIDO : ""
+    PRODUCTO ||--o{ DETALLE_PEDIDO : ""
+    PEDIDO ||--o| PAGO : ""
+    PRODUCTO ||--o{ AUDITORIA_PRECIO : ""
